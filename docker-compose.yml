@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+
+  # PostgreSQL with TimescaleDB extension
+  # Used for: stock entity state, score history, OHLCV time-series
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: squeezradar_postgres
+    environment:
+      POSTGRES_DB: squeezradar
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d squeezradar"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB
+  # Used for: raw Reddit posts, news articles (unstructured docs)
+  mongo:
+    image: mongo:7
+    container_name: squeezradar_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  # Used for: live score cache, leaderboard sorted set, Celery broker
+  redis:
+    image: redis:7-alpine
+    container_name: squeezradar_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Apache Cassandra
+  # Used for: high-write market tick data, borrow rate history
+  cassandra:
+    image: cassandra:4.1
+    container_name: squeezradar_cassandra
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    environment:
+      - CASSANDRA_CLUSTER_NAME=squeezradar_cluster
+      - CASSANDRA_DC=dc1
+      - HEAP_NEWSIZE=128M
+      - MAX_HEAP_SIZE=512M
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # Elasticsearch
+  # Used for: full-text search on Reddit posts, narrative analysis
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: squeezradar_elastic
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_health"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+
+  # Celery Worker
+  # Runs your scheduled scraping tasks
+  celery_worker:
+    build: .
+    container_name: squeezradar_worker
+    command: celery -A pipeline.scheduler.celery_tasks worker
+             --loglevel=info --concurrency=4
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql://admin:password@postgres:5432/squeezradar
+      - MONGO_URL=mongodb://mongo:27017
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    working_dir: /app
+
+  # Celery Beat
+  # The scheduler that triggers tasks on a timer
+  celery_beat:
+    build: .
+    container_name: squeezradar_beat
+    command: celery -A pipeline.scheduler.celery_tasks beat
+             --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+      - celery_worker
+    volumes:
+      - .:/app
+    working_dir: /app
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
+  cassandra_data:
+  elastic_data:

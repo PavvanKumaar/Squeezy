@@ -1,0 +1,29 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Data (too large for git)
+data/training/*.parquet
+data/training/*.csv
+
+# Models (too large for git)
+models/*.pkl
+models/*.joblib
+models/*.pt
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Docker volumes (local only)
+postgres_data/
+mongo_data/
+redis_data/

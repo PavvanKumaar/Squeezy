@@ -1,0 +1,45 @@
+# Data collection
+yfinance==0.2.40
+praw==7.7.1
+requests==2.31.0
+beautifulsoup4==4.12.3
+pytrends==4.9.2
+finvizfinance==0.14.7
+
+# Database drivers
+psycopg2-binary==2.9.9
+pymongo==4.6.1
+redis==5.0.1
+cassandra-driver==3.29.1
+elasticsearch==8.12.0
+
+# Data processing
+pandas==2.1.4
+numpy==1.26.3
+
+
+# Task scheduling
+celery==5.3.6
+celery[redis]==5.3.6
+
+# ML + NLP (install later when needed)
+# scikit-learn==1.4.0
+# lightgbm==4.3.0
+# xgboost==2.0.3
+# shap==0.44.0
+# transformers==4.37.0
+# torch==2.1.2
+
+# API
+fastapi==0.109.0
+uvicorn==0.27.0
+python-dotenv==1.0.0
+pydantic==2.5.3
+
+# Testing
+pytest==7.4.4
+
+# Notebooks
+jupyter==1.0.0
+matplotlib==3.8.2
+seaborn==0.13.1
