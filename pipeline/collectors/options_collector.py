@@ -218,7 +218,10 @@ class OptionsCollector:
                 total_put_vol   BIGINT,
                 nearest_expiry  VARCHAR(20),
                 expiry_count    INTEGER,
-                collected_at    TIMESTAMP DEFAULT NOW()
+                collected_at    TIMESTAMP DEFAULT NOW(),
+                iv_current      FLOAT,
+                iv_pct          FLOAT,
+                options_eligible BOOL
             )
         """)
 
@@ -227,9 +230,9 @@ class OptionsCollector:
                 ticker, call_put_ratio, max_pain,
                 iv_rank, total_call_oi, total_put_oi,
                 total_call_vol, total_put_vol,
-                nearest_expiry, expiry_count
+                nearest_expiry, expiry_count,iv_current,iv_pct,options_eligible
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s,%s,%s
             )
         """, (
             ticker,
@@ -241,7 +244,10 @@ class OptionsCollector:
             metrics.get('total_call_vol'),
             metrics.get('total_put_vol'),
             metrics.get('nearest_expiry'),
-            metrics.get('expiry_count')
+            metrics.get('expiry_count'),
+            metrics.get('iv_current'),
+            metrics.get('iv_pct'),
+            metrics.get('options_eligible')
         ))
         self.conn.commit()
 
@@ -259,5 +265,7 @@ class OptionsCollector:
 
     def close(self):
         self.conn.close()
+
+    
 
 
