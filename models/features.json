@@ -1,0 +1,13 @@
+{
+  "features": [
+    "volume_ratio_30d",
+    "price_change_1d",
+    "price_change_5d",
+    "rsi_14",
+    "distance_from_52w_high",
+    "atr_pct",
+    "volatility_10d"
+  ],
+  "target": "squeezed_10d",
+  "embargo_days": 21
+}

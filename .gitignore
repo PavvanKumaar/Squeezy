@@ -27,3 +27,6 @@ notebooks/.ipynb_checkpoints/
 postgres_data/
 mongo_data/
 redis_data/
+
+*.parquet
+*.pkl
