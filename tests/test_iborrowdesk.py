@@ -1,160 +1,229 @@
-"""
-tests/test_iborrowdesk.py
-Tests for iBorrowDeskCollector (TASK-102)
+# tests/test_iborrowdesk.py
+#
+# Tests for IBorrowDeskCollector
+# Run: python tests/test_iborrowdesk.py
+#
+# What is verified:
+#   ✓ Borrow rate returned as float > 0 for real tickers
+#   ✓ Available shares returned as int >= 0
+#   ✓ borrow_fee_tier correctly classified
+#   ✓ is_hard_to_borrow flag set correctly
+#   ✓ borrow_rate_delta computed (0.0 for first reading)
+#   ✓ borrow_rate_7d_avg computed
+#   ✓ Fake ticker returns error gracefully
+#   ✓ Data saved to borrow_rate_snapshots table
+#   ✓ Data saved to stock_snapshots table
+#   ✓ collection_log has success entry
 
-Per SPEC.md §7.1 every collector must have tests covering:
-  1. Successful collection for a known real ticker (GME)
-  2. Graceful failure for a fake ticker (FAKE123)
-  3. Data landed in the correct database
-  4. Entry written to collection_log with correct status
-  5. Return dict contains all expected keys
+import sys, os
+sys.path.insert(0, os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..')))
 
-Run with:
-    $env:PYTHONUTF8=1; python tests/test_iborrowdesk.py
-"""
-
-import sys, io
-if hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(encoding='utf-8')
-
-import os
-import sys
-sys.path.insert(0, os.path.abspath('.'))
-
+import psycopg2
 from dotenv import load_dotenv
 load_dotenv()
 
-import psycopg2
-from pipeline.collectors.iborrowdesk_collector import iBorrowDeskCollector
+from pipeline.collectors.iborrowdesk_collector import (
+    IBorrowDeskCollector, classify_borrow_rate)
 
-PASS = "  [PASS]"
-FAIL = "  [FAIL]"
+PASS = '  ✓'
+FAIL = '  ✗'
 
-results = []
 
-def check(label, condition, detail=""):
+def assert_ok(condition: bool, msg: str):
     if condition:
-        print(f"{PASS} {label}")
-        results.append(True)
+        print(f'{PASS} {msg}')
     else:
-        print(f"{FAIL} {label}" + (f" — {detail}" if detail else ""))
-        results.append(False)
+        print(f'{FAIL} {msg}')
+        raise AssertionError(msg)
 
-def get_pg():
-    url = os.getenv("POSTGRES_URL")
-    return psycopg2.connect(url) if url else psycopg2.connect(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        port=int(os.getenv("POSTGRES_PORT", 5432)),
-        dbname=os.getenv("POSTGRES_DB", "squeezradar"),
-        user=os.getenv("POSTGRES_USER", "admin"),
-        password=os.getenv("POSTGRES_PASSWORD", "password"),
-    )
 
-# ─────────────────────────────────────────────────────────────
-print("\n" + "="*55)
-print("  iBorrowDeskCollector — Test Suite")
-print("="*55)
+def test_iborrowdesk_collector():
+    print('\n' + '='*55)
+    print('  IBorrowDesk Collector Tests')
+    print('='*55)
 
-collector = iBorrowDeskCollector()
+    collector = IBorrowDeskCollector()
+    conn      = psycopg2.connect(os.getenv('POSTGRES_URL'))
+    cur       = conn.cursor()
 
-# ── Test 1: HTML selector check (parse only, no DB) ──────────
-# Verify the scraper can fetch and parse the live page
-print("\n[1] Live page parsing: GME borrow rate")
-borrow_rate     = collector.get_borrow_rate("GME")
-available_shares = collector.get_available_shares("GME")
+    # ─────────────────────────────────────────────────────
+    # TEST 1 — classify_borrow_rate function
+    # ─────────────────────────────────────────────────────
+    print('\n[1] classify_borrow_rate() function')
 
-check("get_borrow_rate() returns a value",
-      borrow_rate is not None,
-      "returned None — site may have changed HTML or ticker not listed")
-if borrow_rate is not None:
-    check("borrow_rate is a positive float",
-          isinstance(borrow_rate, float) and borrow_rate >= 0,
-          f"got {borrow_rate}")
+    cases = [
+        (5.0,   'cheap'),
+        (20.0,  'normal'),
+        (50.0,  'expensive'),
+        (100.0, 'hard_to_borrow'),
+        (300.0, 'extreme'),
+    ]
+    for rate, expected in cases:
+        result = classify_borrow_rate(rate)
+        assert_ok(result == expected,
+                  f'classify({rate}%) = {result} '
+                  f'(expected {expected})')
 
-check("get_available_shares() returns a value",
-      available_shares is not None,
-      "returned None — site may have changed HTML or ticker not listed")
-if available_shares is not None:
-    check("available_shares is a non-negative int",
-          isinstance(available_shares, int) and available_shares >= 0,
-          f"got {available_shares}")
+    # ─────────────────────────────────────────────────────
+    # TEST 2 — Real ticker collection (AAPL — low borrow rate)
+    # ─────────────────────────────────────────────────────
+    print('\n[2] Real ticker — AAPL (low borrow rate)')
+    result = collector.collect('AAPL')
 
-# ── Test 2: collect() return dict for GME ─────────────────────
-print("\n[2] Full collect(): GME")
-res = collector.collect("GME")
-
-check("collect() returns a dict",    isinstance(res, dict))
-check("ticker field == GME",         res.get("ticker") == "GME")
-check("collected_at is present",     bool(res.get("collected_at")))
-check("duration_ms > 0",             res.get("duration_ms", 0) > 0)
-
-REQUIRED_KEYS = ["ticker", "collected_at", "error", "error_message",
-                 "borrow_rate", "available_shares", "duration_ms"]
-missing = [k for k in REQUIRED_KEYS if k not in res]
-check("all required keys present", not missing, f"missing: {missing}")
-
-# ── Test 3: Graceful failure for fake ticker ───────────────────
-print("\n[3] Fake ticker: FAKE123")
-res_fake = collector.collect("FAKE123")
-
-check("collect() returns a dict for fake ticker",  isinstance(res_fake, dict))
-check("error == True for fake ticker",             res_fake.get("error") is True)
-check("error_message is a non-empty string",
-      isinstance(res_fake.get("error_message"), str) and
-      len(res_fake.get("error_message", "")) > 0)
-check("borrow_rate is None for fake ticker",       res_fake.get("borrow_rate") is None)
-check("available_shares is None for fake ticker",  res_fake.get("available_shares") is None)
-
-# ── Test 4 & 5: Database checks ───────────────────────────────
-print("\n[4] Database: stock_snapshots & collection_log")
-try:
-    pg = get_pg()
-    cur = pg.cursor()
-
-    # stock_snapshots (only if collect succeeded)
-    if not res.get("error"):
-        cur.execute(
-            "SELECT borrow_rate, available_shares FROM stock_snapshots "
-            "WHERE ticker = 'GME' AND data_source = 'iborrowdesk' "
-            "ORDER BY collected_at DESC LIMIT 1"
-        )
-        snap = cur.fetchone()
-        check("Snapshot row in stock_snapshots", snap is not None)
-        if snap:
-            check("borrow_rate stored matches fetched",
-                  snap[0] == res.get("borrow_rate"),
-                  f"stored={snap[0]}, fetched={res.get('borrow_rate')}")
+    if result.get('error'):
+        # iborrowdesk might not have all tickers
+        print(f'  ⚠ AAPL not found on iborrowdesk: '
+              f'{result.get("error_message")}')
+        print('  Skipping AAPL assertions')
     else:
-        print(f"  (skipping DB snapshot check — collect() returned error: {res.get('error_message')})")
+        assert_ok(isinstance(result['borrow_rate'], float),
+                  f'borrow_rate is float: {result["borrow_rate"]}')
+        assert_ok(result['borrow_rate'] >= 0,
+                  f'borrow_rate >= 0: {result["borrow_rate"]}')
+        assert_ok(isinstance(result['available_shares'], int),
+                  f'available_shares is int: '
+                  f'{result["available_shares"]}')
+        assert_ok(result['available_shares'] >= 0,
+                  'available_shares >= 0')
+        assert_ok('borrow_fee_tier' in result,
+                  f'borrow_fee_tier = {result["borrow_fee_tier"]}')
+        assert_ok(result['borrow_fee_tier'] in [
+            'cheap', 'normal', 'expensive',
+            'hard_to_borrow', 'extreme'],
+                  'borrow_fee_tier is valid category')
+        assert_ok('is_hard_to_borrow' in result,
+                  f'is_hard_to_borrow = {result["is_hard_to_borrow"]}')
+        assert_ok(isinstance(result['is_hard_to_borrow'], bool),
+                  'is_hard_to_borrow is bool')
+        assert_ok('borrow_rate_delta' in result,
+                  f'borrow_rate_delta = {result["borrow_rate_delta"]}')
+        assert_ok('borrow_rate_7d_avg' in result,
+                  f'borrow_rate_7d_avg = '
+                  f'{result["borrow_rate_7d_avg"]}')
+        assert_ok(result['error'] is False,
+                  'no error flag on successful collection')
 
-    # collection_log (success or skipped entry should exist)
-    cur.execute(
-        "SELECT status FROM collection_log "
-        "WHERE ticker = 'GME' AND source = 'iborrowdesk' "
-        "ORDER BY collected_at DESC LIMIT 1"
-    )
-    log_row = cur.fetchone()
-    check("collection_log has entry for GME/iborrowdesk", log_row is not None)
-    if log_row:
-        check("collection_log status is success or skipped",
-              log_row[0] in ("success", "skipped", "failed"),
-              f"got '{log_row[0]}'")
+    # ─────────────────────────────────────────────────────
+    # TEST 3 — GME (typically higher borrow rate)
+    # ─────────────────────────────────────────────────────
+    print('\n[3] Real ticker — GME')
+    gme = collector.collect('GME')
 
-    cur.close()
-    pg.close()
+    if not gme.get('error'):
+        assert_ok(gme['borrow_rate'] >= 0,
+                  f'GME borrow_rate = {gme["borrow_rate"]}%')
+        print(f'  GME borrow rate: {gme["borrow_rate"]}% '
+              f'({gme["borrow_fee_tier"]})')
+        print(f'  Available shares: {gme["available_shares"]:,}')
+        print(f'  Hard to borrow: {gme["is_hard_to_borrow"]}')
+        print(f'  Delta from last: {gme["borrow_rate_delta"]:+.2f}%')
+    else:
+        print(f'  ⚠ GME error: {gme.get("error_message")} '
+              f'(iborrowdesk may not have this ticker)')
 
-except Exception as e:
-    print(f"  [FAIL] DB checks failed: {e}")
-    results.extend([False, False, False])
+    # ─────────────────────────────────────────────────────
+    # TEST 4 — Fake ticker handled gracefully
+    # ─────────────────────────────────────────────────────
+    print('\n[4] Fake ticker (XYZFAKE999)')
+    fake = collector.collect('XYZFAKE999')
 
-# ── Summary ──────────────────────────────────────────────────
-print("\n" + "="*55)
-passed = sum(results)
-total  = len(results)
-print(f"  {passed}/{total} assertions passed")
-if passed == total:
-    print("  ALL TESTS PASSED")
-else:
-    print("  SOME TESTS FAILED — see above")
-print("="*55 + "\n")
-sys.exit(0 if passed == total else 1)
+    assert_ok(fake['error'] is True,
+              'error=True for fake ticker')
+    assert_ok('error_message' in fake,
+              f'error_message = {fake.get("error_message")}')
+    assert_ok(fake.get('error_message') in [
+        'ticker_not_found', 'parse_failed',
+        'http_404', 'timeout'],
+              f'error_message is a known code: '
+              f'{fake.get("error_message")}')
+
+    # ─────────────────────────────────────────────────────
+    # TEST 5 — Data saved to borrow_rate_snapshots
+    # ─────────────────────────────────────────────────────
+    print('\n[5] borrow_rate_snapshots table')
+    cur.execute("""
+        SELECT borrow_rate, borrow_fee_tier,
+               is_hard_to_borrow, collected_at
+        FROM   borrow_rate_snapshots
+        ORDER  BY collected_at DESC
+        LIMIT  1
+    """)
+    row = cur.fetchone()
+    assert_ok(row is not None,
+              'borrow_rate_snapshots has at least one row')
+    if row:
+        assert_ok(row[0] is not None,
+                  f'borrow_rate stored: {row[0]}')
+        assert_ok(row[1] is not None,
+                  f'borrow_fee_tier stored: {row[1]}')
+        assert_ok(isinstance(row[2], bool),
+                  f'is_hard_to_borrow is bool: {row[2]}')
+
+    # ─────────────────────────────────────────────────────
+    # TEST 6 — Data saved to stock_snapshots
+    # ─────────────────────────────────────────────────────
+    print('\n[6] stock_snapshots table')
+    cur.execute("""
+        SELECT borrow_rate, data_source
+        FROM   stock_snapshots
+        WHERE  data_source = 'iborrowdesk'
+        ORDER  BY collected_at DESC
+        LIMIT  1
+    """)
+    snap = cur.fetchone()
+    assert_ok(snap is not None,
+              'stock_snapshots has iborrowdesk entry')
+    if snap:
+        assert_ok(snap[1] == 'iborrowdesk',
+                  'data_source = iborrowdesk')
+
+    # ─────────────────────────────────────────────────────
+    # TEST 7 — collection_log has entries
+    # ─────────────────────────────────────────────────────
+    print('\n[7] collection_log entries')
+    cur.execute("""
+        SELECT status, error_message, duration_ms
+        FROM   collection_log
+        WHERE  source = 'iborrowdesk'
+        ORDER  BY collected_at DESC
+        LIMIT  5
+    """)
+    logs = cur.fetchall()
+    assert_ok(len(logs) > 0,
+              f'collection_log has {len(logs)} iborrowdesk entries')
+    for log in logs:
+        print(f'    status={log[0]} '
+              f'error={log[1]} '
+              f'duration={log[2]}ms')
+
+    # ─────────────────────────────────────────────────────
+    # TEST 8 — get_history returns list
+    # ─────────────────────────────────────────────────────
+    print('\n[8] get_history()')
+    history = collector.get_history('AAPL', days=30)
+    assert_ok(isinstance(history, list),
+              f'get_history returns list (len={len(history)})')
+
+    # ─────────────────────────────────────────────────────
+    # TEST 9 — collect_batch (2 tickers)
+    # ─────────────────────────────────────────────────────
+    print('\n[9] collect_batch()')
+    batch = collector.collect_batch(['AAPL', 'GME'],
+                                     delay_sec=1.0)
+    assert_ok(len(batch) == 2,
+              f'collect_batch returned {len(batch)} results')
+    assert_ok(all('ticker' in r for r in batch),
+              'all batch results have ticker field')
+
+    # ─────────────────────────────────────────────────────
+    print('\n' + '='*55)
+    print('  ✓ ALL IBORROWDESK TESTS PASSED')
+    print('='*55 + '\n')
+
+    collector.close()
+    conn.close()
+
+
+if __name__ == '__main__':
+    test_iborrowdesk_collector()

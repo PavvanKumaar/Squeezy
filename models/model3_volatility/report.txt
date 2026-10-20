@@ -1,0 +1,57 @@
+
+==============================================================================
+SQUEEZERADAR v1.2 — Model 3: Realized-Volatility Forecast
+==============================================================================
+Generated: 2026-10-20T19:27:51
+Features: ['volume_ratio_30d_norm', 'price_change_1d_norm', 'price_change_5d_norm', 'rsi_14_norm', 'volatility_10d_norm', 'atr_norm', 'abs_price_change_1d_norm', 'abs_price_change_5d_norm']
+Target y3: log(max(fwd_vol_10d, 0.003))
+
+Model 3 — Realized-Volatility Forecast:
+  Train+val rows: 157,001  Test: 276,419
+  y3 (log fwd_vol_10d) range: [-5.809, 1.834]
+
+--- Baseline: naive forecast (volatility_10d_norm * 0.5) ---
+  Naive train+val: {'n': 157001, 'rmse': 0.51352, 'r2': 0.5194}
+
+--- OLS benchmark ---
+  OLS OOF: {'n': 157001, 'rmse': 0.53237, 'r2': 0.4835}
+
+--- LightGBM quantile OOF CV (alpha = 0.1, 0.5, 0.9) ---
+  alpha=0.1 OOF: {'n': 157001, 'rmse': 0.5921, 'r2': 0.3611}
+  alpha=0.5 OOF: {'n': 157001, 'rmse': 0.37373, 'r2': 0.7455}
+  alpha=0.9 OOF: {'n': 157001, 'rmse': 0.57273, 'r2': 0.4022}
+
+--- Band coverage (80% band: p10 to p90) ---
+  80% band coverage (p10-p90): 78.5% (target ~80%)
+
+--- Per-fold stability (median quantile, p50) ---
+    n    rmse     r2  fold
+36148 0.36592 0.7193     0
+30127 0.36787 0.7046     1
+29636 0.38393 0.7473     2
+28478 0.36910 0.7536     3
+32612 0.38277 0.7708     4
+
+--- Per-year stability (p50) ---
+    n    rmse     r2  year
+31603 0.37802 0.6979  2018
+33654 0.37161 0.7210  2019
+50581 0.38861 0.7319  2020
+41163 0.35674 0.7420  2021
+
+--- Viability vs naive forecast ---
+  Model beats naive in 5/5 folds (RMSE).
+
+--- Final models (all train+val) ---
+  alpha=0.1: 592 rounds
+  alpha=0.5: 825 rounds
+  alpha=0.9: 977 rounds
+
+==============================================================================
+Model 3: Test Split
+==============================================================================
+     n    rmse     r2  alpha
+276419 0.61169 0.3226    0.1
+276419 0.37965 0.7390    0.5
+276419 0.58711 0.3759    0.9
+  Test band coverage: 80.0%

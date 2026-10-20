@@ -1,0 +1,116 @@
+
+==============================================================================
+SQUEEZERADAR - MODEL TRAINING REPORT
+==============================================================================
+Generated : 2026-10-19T15:36:36
+Target    : squeezed_10d   Features (7): volume_ratio_30d, price_change_1d, price_change_5d, rsi_14, distance_from_52w_high, atr_pct, volatility_10d
+Versions  : lightgbm 4.7.0, xgboost 3.2.0
+Train+val rows: 129,328 (positives 5,670, weighted base rate 1.833%)
+Test rows     : 212,469 (held out; scored only with --score-test)
+
+==============================================================================
+1. CROSS-VALIDATION (5 time-cluster folds, 21-day embargo)
+==============================================================================
+  fold 0: train 81,881 | early-stop 22,712 | val 10,799 | best iters lgbm 222, xgb 319
+  fold 1: train 64,906 | early-stop 22,819 | val 22,712 | best iters lgbm 161, xgb 132
+  fold 2: train 54,617 | early-stop 29,737 | val 24,319 | best iters lgbm 165, xgb 216
+  fold 3: train 40,886 | early-stop 33,550 | val 33,874 | best iters lgbm 82, xgb 110
+  fold 4: train 66,835 | early-stop 8,502 | val 37,624 | best iters lgbm 121, xgb 147
+
+==============================================================================
+2. OUT-OF-FOLD METRICS (pooled, weighted)
+==============================================================================
+     model      n  pos  base_%  PR_AUC  ROC_AUC   brier  logloss  mean_pred_%  prec@1%  lift@1%  prec@5%  lift@5%
+  lgbm_raw 129328 5670   1.833  0.0828   0.8579 0.01727  0.07469        1.923    11.81      6.4    10.03      5.5
+lgbm_platt 129328 5670   1.833  0.0777   0.8524 0.01734  0.07543        1.907    10.09      5.5     9.22      5.0
+   xgb_raw 129328 5670   1.833  0.0819   0.8584 0.01727  0.07459        1.921    11.18      6.1     9.54      5.2
+ xgb_platt 129328 5670   1.833  0.0773   0.8537 0.01735  0.07532        1.909     9.97      5.4     8.62      4.7
+   avg_raw 129328 5670   1.833  0.0825   0.8587 0.01726  0.07458        1.922    11.45      6.2     9.94      5.4
+ avg_platt 129328 5670   1.833  0.0775   0.8537 0.01734  0.07532        1.907     9.72      5.3     8.84      4.8
+Read: PR_AUC vs base_% shows skill (random PR_AUC = base rate). Brier/logloss and mean_pred_% vs base_% show calibration. Platt rows are cross-fitted.
+
+==============================================================================
+3. PER-FOLD STABILITY (lgbm_platt) - lift should be > 1 in every fold
+==============================================================================
+ fold     n  pos  base_%  PR_AUC  ROC_AUC   brier  logloss  mean_pred_%  prec@1%  lift@1%  prec@5%  lift@5%
+    0 10799 1092   3.998  0.1160   0.8131 0.03691  0.14642        2.398    13.30      3.3    12.98      3.2
+    1 22712 1163   2.287  0.1216   0.8763 0.02105  0.08628        1.864    17.05      7.5    15.33      6.7
+    2 24319 1152   2.055  0.0980   0.8704 0.01932  0.08242        1.325    10.96      5.3    11.90      5.8
+    3 33874 1100   1.333  0.0678   0.8638 0.01312  0.06193        2.544    11.55      8.7     8.18      6.1
+    4 37624 1163   1.356  0.0618   0.8534 0.01300  0.05977        1.603     8.32      6.1     7.24      5.3
+
+==============================================================================
+4. BY YEAR (lgbm_platt) - regime / survivorship check
+==============================================================================
+ year     n  pos  base_%  PR_AUC  ROC_AUC   brier  logloss  mean_pred_%  prec@1%  lift@1%  prec@5%  lift@5%
+ 2018 25480  434   0.773  0.0643   0.8828 0.00746  0.03641        1.028     9.68     12.5     7.09      9.2
+ 2019 27110  506   0.812  0.0564   0.8947 0.00797  0.03848        1.293     8.91     11.0     5.98      7.4
+ 2020 40533 2859   3.504  0.0972   0.7943 0.03258  0.13319        2.910    10.89      3.1    11.58      3.3
+ 2021 36205 1871   1.985  0.0664   0.8196 0.01895  0.08410        2.195     7.86      4.0     7.95      4.0
+
+==============================================================================
+5. MODEL vs RULE BASELINE at the same alert rate
+==============================================================================
+model  alert_rate_%  rule_prec_%  model_prec_%  model/rule
+ lgbm          0.23        10.77          9.09        0.84
+  xgb          0.23        10.77         10.69        0.99
+  avg          0.23        10.77         10.10        0.94
+
+Does the model add anything beyond single features? (OOF, weighted)
+              score  PR_AUC  ROC_AUC  prec@1%  lift@1%  prec@5%  lift@5%
+       model (lgbm)  0.0828   0.8579    11.81      6.4    10.03      5.5
+       atr_pct only  0.0909   0.8632    14.29      7.8    10.85      5.9
+volatility_10d only  0.0764   0.8316    13.15      7.2     9.76      5.3
+  volume_ratio only  0.0233   0.5033     5.25      2.9     3.61      2.0
+       5d move only  0.0379   0.5036    10.89      5.9     6.87      3.7
+
+==============================================================================
+6. CALIBRATION TABLE (lgbm): raw vs Platt, pooled OOF
+==============================================================================
+raw:
+   pred_bin  weighted_share_%  mean_pred_%  actual_%  rows
+0.000-0.005             52.69         0.20      0.14 55726
+0.005-0.010              9.75         0.74      0.67 11050
+0.010-0.020             11.22         1.42      1.39 13519
+0.020-0.040             10.38         2.89      3.16 14628
+0.040-0.080              9.37         5.71      6.22 17257
+0.080-0.150              5.84        10.64      9.23 15037
+0.150-0.300              0.74        17.63     11.80  2104
+0.300-1.000              0.00        33.74      0.00     7
+platt:
+   pred_bin  weighted_share_%  mean_pred_%  actual_%  rows
+0.000-0.005             52.63         0.21      0.15 55704
+0.005-0.010              9.39         0.74      0.63 10665
+0.010-0.020             11.77         1.45      1.48 14172
+0.020-0.040             10.67         2.89      3.30 15195
+0.040-0.080              9.22         5.69      6.40 17409
+0.080-0.150              5.60        10.61      8.99 14191
+0.150-0.300              0.72        17.60     10.15  1986
+0.300-1.000              0.00        31.85      0.00     6
+
+==============================================================================
+7. SANITY: label-shuffle test (should be ~0.5 ROC_AUC)
+==============================================================================
+  shuffled-label ROC_AUC on fold 0 (3 shuffles): mean 0.545, range 0.462-0.588
+  Real models should sit clearly above this; if the shuffled AUC is well above 0.55, something leaks.
+
+==============================================================================
+8. FINAL MODELS (all train+val rows) + deployment calibrators
+==============================================================================
+  lgbm: 177 rounds
+  xgb: 161 rounds
+
+Feature importance (gain, normalized):
+                         lgbm    xgb
+atr_pct                 0.713  0.586
+volatility_10d          0.087  0.184
+rsi_14                  0.072  0.065
+distance_from_52w_high  0.057  0.061
+volume_ratio_30d        0.035  0.039
+price_change_5d         0.021  0.036
+price_change_1d         0.015  0.028
+
+==============================================================================
+9. TEST SPLIT (2022+)
+==============================================================================
+Not scored. Freeze your settings, then rerun once with --score-test.

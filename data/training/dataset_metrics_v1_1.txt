@@ -1,0 +1,278 @@
+
+==============================================================================
+SQUEEZERADAR v1.1 - DATASET METRICS
+==============================================================================
+Generated        : 2026-10-19T10:18:56
+yfinance / pandas: 1.7.0 / 2.1.4
+Target           : squeezed_Nd = forward N-day return >= 30% (NaN if window incomplete or spans a data gap)
+Eligibility rule : close >= 0.5, 20d avg $-volume >= 250,000, >= 60 rows of history (mirror this in the live scanner)
+Negatives        : non-event rows kept with p=0.2, sample_weight=5.0
+Synthetic rows   : 0
+
+==============================================================================
+1. UNIVERSE & DOWNLOAD COVERAGE
+==============================================================================
+Symbols requested : 1020
+Downloaded OK     : 981
+Failed / too short: 39 (3.8%)
+Curated symbols with NO data: BBBY, BGFV, EXPR, MULN, PROG, SPRT
+
+--- Failed symbols (first 80) and reasons ---
+  ACCV     only 9 rows
+  ADIG     only 56 rows
+  APUR     only 103 rows
+  ARCL     only 98 rows
+  BBBY     only 65 rows
+  BGFV     empty response (delisted, renamed, or not on Yahoo)
+  BMMX     only 2 rows
+  BRVE     only 51 rows
+  BSP      only 76 rows
+  DPC      only 80 rows
+  EROK     only 108 rows
+  EXPR     empty response (delisted, renamed, or not on Yahoo)
+  FRTT     only 92 rows
+  KPET     only 101 rows
+  LTGR     only 59 rows
+  MBGL     only 79 rows
+  MFP      only 79 rows
+  MTNE     only 83 rows
+  MULN     empty response (delisted, renamed, or not on Yahoo)
+  NUR      only 49 rows
+  OBX      only 59 rows
+  OCTV     only 103 rows
+  PONO     only 115 rows
+  PROG     empty response (delisted, renamed, or not on Yahoo)
+  PWRL     only 100 rows
+  RACC     only 104 rows
+  REA      only 115 rows
+  REF      only 56 rows
+  SBMT     only 118 rows
+  SCAT     only 7 rows
+  SCTX     only 59 rows
+  SECZ     only 75 rows
+  SPRT     empty response (delisted, renamed, or not on Yahoo)
+  TBCV     only 10 rows
+  TREO     only 41 rows
+  TVIV     only 69 rows
+  USDE     only 79 rows
+  WENC     only 109 rows
+  WSE      only 111 rows
+
+SURVIVORSHIP: the universe is CURRENT listings. Delisted/bankrupt names are absent, which biases results toward companies that survived.
+
+==============================================================================
+2. CURATED EVENTS - RE-ANCHORED FROM OHLCV
+==============================================================================
+ event_id symbol  hand_failed hand_start ignition_date  ign_offset_d  hand_peak  peak_date  peak_offset_d  gain_pct  max_vol_ratio  hist_days            status  use_for_training
+BBBY_2022      -        False 2022-08-05           NaT           NaN 2022-08-11        NaT            NaN       NaN            NaN        NaN           no_data             False
+EXPR_2021      -        False 2021-01-27           NaT           NaN 2021-01-28        NaT            NaN       NaN            NaN        NaN           no_data             False
+SPRT_2021      -        False 2021-08-24           NaT           NaN 2021-08-27        NaT            NaN       NaN            NaN        NaN           no_data             False
+MULN_2022      -        False 2022-04-01           NaT           NaN 2022-04-04        NaT            NaN       NaN            NaN        NaN           no_data             False
+BGFV_2021      -         True 2021-11-03           NaT           NaN 2021-11-11        NaT            NaN       NaN            NaN        NaN           no_data             False
+ AMC_2021    AMC        False 2021-05-24    2021-05-13         -11.0 2021-06-02 2021-06-02            0.0     389.8            8.3     1097.0         confirmed              True
+ AMC_2023    AMC        False 2023-05-30           NaT           NaN 2023-06-02        NaT            NaN       8.0            NaN     1611.0       unconfirmed             False
+ATER_2021   ATER        False 2021-09-20    2021-08-30         -21.0 2021-09-22 2021-09-13           -9.0     171.6           17.9      559.0         confirmed              True
+  BB_2021     BB        False 2021-01-22    2021-01-15          -7.0 2021-01-27 2021-01-27            0.0     155.1           11.2     1016.0         confirmed              True
+PROG_2021   BRTX        False 2021-10-19           NaT           NaN 2021-10-29        NaT            NaN       5.3            NaN     1207.0       unconfirmed             False
+CLOV_2021   CLOV        False 2021-06-07    2021-06-07           0.0 2021-06-09 2021-06-08           -1.0      85.8           33.4      247.0         confirmed              True
+FCEL_2021   FCEL        False 2021-01-08           NaT           NaN 2021-01-21        NaT            NaN      82.5            NaN     1011.0       unconfirmed             False
+FIZZ_2021   FIZZ         True 2021-02-15    2021-01-25         -21.0 2021-02-20 2021-01-27          -24.0      62.9           10.3     1021.0 relabeled_squeeze              True
+ GME_2021    GME        False 2021-01-13    2021-01-13           0.0 2021-01-28 2021-01-27           -1.0    1006.7           12.8     1014.0         confirmed              True
+ HKD_2022    HKD        False 2022-08-01           NaT           NaN 2022-08-02        NaT            NaN     126.3            NaN       11.0       unconfirmed             False
+KOSS_2021   KOSS        False 2021-01-22    2021-01-25           3.0 2021-01-28 2021-01-29            1.0     966.7           36.7     1021.0         confirmed              True
+LGND_2021   LGND         True 2021-01-15    2021-01-25          10.0 2021-01-20 2021-02-09           20.0      38.3           13.1     1021.0 relabeled_squeeze              True
+MVIS_2021   MVIS        False 2021-04-14    2021-03-31         -14.0 2021-04-28 2021-04-26           -2.0      42.5           12.5     1067.0         confirmed              True
+ NOK_2021    NOK        False 2021-01-22    2021-01-25           3.0 2021-01-27 2021-01-27            0.0      35.1           22.6     1021.0         confirmed              True
+SENS_2021   SENS        False 2021-06-10    2021-06-04          -6.0 2021-06-14 2021-06-28           14.0      42.3           15.4     1112.0         confirmed              True
+SPCE_2021   SPCE        False 2021-02-01    2021-01-14         -18.0 2021-02-08 2021-02-11            3.0      79.9            4.2      828.0         confirmed              True
+TLRY_2021   TLRY        False 2021-02-08    2021-02-09           1.0 2021-02-10 2021-02-10            0.0      50.9            5.2      644.0         confirmed              True
+WKHS_2021   WKHS        False 2021-02-16           NaT           NaN 2021-02-18        NaT            NaN       0.0            NaN     1036.0       unconfirmed             False
+
+--- Status counts ---
+                   events
+status                   
+confirmed              11
+no_data                 5
+unconfirmed             5
+relabeled_squeeze       2
+
+--- Reasons for events NOT used for training ---
+  BBBY_2022    no_data                only 65 rows
+  EXPR_2021    no_data                empty response (delisted, renamed, or not on Yahoo)
+  SPRT_2021    no_data                empty response (delisted, renamed, or not on Yahoo)
+  MULN_2022    no_data                empty response (delisted, renamed, or not on Yahoo)
+  BGFV_2021    no_data                empty response (delisted, renamed, or not on Yahoo)
+  AMC_2023     unconfirmed            no ignition (vol>=3x & jump) followed by a >=30% gain
+  PROG_2021    unconfirmed            no ignition (vol>=3x & jump) followed by a >=30% gain
+  FCEL_2021    unconfirmed            no ignition (vol>=3x & jump) followed by a >=30% gain
+  HKD_2022     unconfirmed            no ignition (vol>=3x & jump) followed by a >=30% gain
+  WKHS_2021    unconfirmed            no ignition (vol>=3x & jump) followed by a >=30% gain
+
+==============================================================================
+3. MINED EVENTS (data-defined, whole universe)
+==============================================================================
+Mined episodes: 1140   (ignition: vol ratio >= 3.0x and (1d >= 10% or 5d >= 25%); gain >= 30% within 30 trading days)
+      episodes  median_gain_pct  p90_gain_pct  symbols
+year                                                  
+2018        39             55.4         106.3       34
+2019        46             47.6         130.5       42
+2020       203             55.8         180.9      148
+2021       122             56.5         181.6       94
+2022        92             47.0         121.5       84
+2023       104             50.6         132.6       84
+2024       182             61.7         195.0      134
+2025       217             58.8         172.8      183
+2026       135             60.0         231.1      123
+
+--- Top 15 mined episodes by gain (sanity check them on a chart) ---
+       event_id ignition_date  peak_date  gain_pct  max_vol_ratio
+M_TDIC_20260421    2026-04-21 2026-05-13    2182.2           40.1
+M_DFNS_20241111    2024-11-11 2024-12-19    1829.6          628.7
+M_DFNS_20260721    2026-07-21 2026-07-30    1193.5           75.8
+M_CDIO_20231026    2023-10-26 2023-11-28     981.4          114.8
+ M_BVC_20260102    2026-01-02 2026-01-05     953.6            9.2
+M_GRML_20250516    2025-05-16 2025-06-10     793.3          542.0
+ M_DUO_20240924    2024-09-24 2024-10-02     712.6          291.5
+M_HYPD_20250522    2025-05-22 2025-07-02     679.3          218.9
+M_FLNA_20210113    2021-01-13 2021-02-03     668.1           23.7
+M_DAIC_20260804    2026-08-04 2026-08-27     666.0          154.3
+ M_SOS_20210106    2021-01-06 2021-02-17     644.2           69.3
+M_VEEE_20260707    2026-07-07 2026-07-17     587.4          457.2
+M_BATL_20260219    2026-02-19 2026-03-03     570.2            6.1
+M_RVSN_20240122    2024-01-22 2024-01-30     565.8           48.4
+M_DFDV_20250410    2025-04-10 2025-05-22     561.6            4.2
+
+Usable episodes total (curated + mined): 1153
+
+==============================================================================
+4. PANEL OVERVIEW
+==============================================================================
+Rows kept                : 348,557
+Symbols with rows        : 975
+Date range               : 2018-01-02 -> 2026-10-16
+Event-window rows        : 90,171
+Sum of sample_weight     : 1,382,101  (~ natural eligible row count)
+rows with row_ok         : 346,375 (99.4%)
+
+--- Natural base rate (weighted) of forward squeezes ---
+      target  weighted_base_rate_%  unweighted_rate_%  positives(raw rows)
+ squeezed_5d                 0.904              2.189                 7583
+squeezed_10d                 1.925              4.363                15113
+
+--- Selection effect: squeezed_10d rate inside vs outside event windows (weighted) ---
+  inside event windows : 13.67%
+  outside event windows: 1.10%
+
+--- Weighted base rate by year (watch for regime shifts) ---
+         rows  rate5d_%  rate10d_%
+year                              
+2018  25480.0     0.331      0.773
+2019  27110.0     0.324      0.812
+2020  40533.0     1.568      3.504
+2021  40783.0     0.860      1.827
+2022  38142.0     0.626      1.474
+2023  38229.0     0.805      1.670
+2024  45302.0     1.052      2.077
+2025  52295.0     1.280      2.502
+2026  38501.0     1.022      2.236
+
+--- Phase labels (descriptive only; events with use_for_training) ---
+                  rows
+lifecycle_phase       
+Early Setup      41473
+Squeeze Zone     21751
+Cooldown         13596
+Heating Up        9603
+Danger Zone       3549
+
+==============================================================================
+5. NULLS / FEATURE QUALITY
+==============================================================================
+                        nan_count  nan_pct
+volume_ratio_30d                0      0.0
+price_change_1d                 0      0.0
+price_change_5d                 0      0.0
+rsi_14                          0      0.0
+distance_from_52w_high          0      0.0
+atr_pct                         0      0.0
+volatility_10d                  0      0.0
+
+--- Descriptive statistics (raw) ---
+                           count     mean      std     min       1%       5%      50%      95%      99%        max
+volume_ratio_30d        348557.0   1.2852   8.9803  0.0000   0.0385   0.2360   0.8316   2.4246   6.2918  1458.8277
+price_change_1d         348557.0   0.0021   0.0796 -0.9714  -0.1379  -0.0665   0.0000   0.0718   0.1801     9.5357
+price_change_5d         348557.0   0.0131   0.2970 -0.9903  -0.3075  -0.1514   0.0006   0.1875   0.5189    84.7143
+rsi_14                  348557.0  50.8088  12.9026  1.3088  22.2188  30.1084  50.4380  72.5631  81.3957    98.5288
+distance_from_52w_high  348557.0   0.3358   0.2737 -0.0000   0.0038   0.0190   0.2598   0.8835   0.9847     1.0000
+atr_pct                 348557.0   0.0695   0.1845  0.0003   0.0111   0.0174   0.0461   0.1665   0.3420    25.6183
+volatility_10d          348557.0   0.0437   0.1801  0.0000   0.0049   0.0089   0.0281   0.1141   0.2517    47.9737
+
+--- Rows hitting normalization clip bounds ---
+               feature  below  above  pct
+      volume_ratio_30d      0    891 0.26
+       price_change_1d      0    156 0.04
+       price_change_5d      0   1141 0.33
+                rsi_14      0      0 0.00
+distance_from_52w_high      5      0 0.00
+               atr_pct      0    647 0.19
+        volatility_10d      0   1003 0.29
+Trees do not need normalization: train on RAW features; keep _norm only for parity.
+
+==============================================================================
+6. SPLITS (chronological, embargo before each boundary)
+==============================================================================
+train < 2021-07-01 | val 2021-07-01..2022-01-01 | test >= 2022-01-01 | purged = 21 days before each boundary
+ split   rows  row_ok  symbols  usable_events  pos_5d  pos_10d  base5d_%  base10d_%       from         to
+ train 111672  111471      690            392    2502     5207     0.872      1.952 2018-01-02 2021-06-09
+   val  17857   17857      718             80     244      463     0.519      1.133 2021-07-01 2021-12-10
+  test 214450  212469      972            736    4792     9355     0.970      2.010 2022-01-03 2026-10-16
+purged   4578    4578      699             79      45       88     0.280      0.634 2021-06-10 2021-12-31
+
+==============================================================================
+7. CV FOLDS (groups = calendar quarter; events grouped by ignition quarter)
+==============================================================================
+ fold  groups  rows  pos_10d  base10d_%  usable_events
+    0       2 17578     1125      2.819             71
+    1       3 18037     1124      2.377             85
+    2       3 22994     1141      2.279             80
+    3       5 40107     1143      1.187            103
+    4       4 30813     1137      1.585            102
+Quarter -> fold: 2018Q1:2, 2018Q2:3, 2018Q3:1, 2018Q4:0, 2019Q1:4, 2019Q2:3, 2019Q3:2, 2019Q4:4, 2020Q1:4, 2020Q2:2, 2020Q3:3, 2020Q4:0, 2021Q1:1, 2021Q2:4, 2021Q3:3, 2021Q4:3, 2022Q1:1
+Independent episodes represented: usable events 1153; distinct groups with >=1 usable event: 35
+
+==============================================================================
+8. UNIVARIATE AUC (weighted, row_ok rows) - stability across time
+==============================================================================
+0.5 = no signal. Large train-vs-test differences = regime shift or overfitting risk.
+               feature  train_5d  train_10d  val_5d  val_10d  test_5d  test_10d
+      volume_ratio_30d     0.544      0.500   0.614    0.521    0.487     0.469
+       price_change_1d     0.506      0.486   0.481    0.455    0.487     0.478
+       price_change_5d     0.495      0.504   0.523    0.485    0.478     0.482
+                rsi_14     0.478      0.483   0.504    0.470    0.451     0.460
+distance_from_52w_high     0.771      0.759   0.730    0.703    0.777     0.751
+               atr_pct     0.897      0.869   0.828    0.787    0.860     0.831
+        volatility_10d     0.867      0.837   0.818    0.759    0.830     0.797
+
+==============================================================================
+9. RULE BASELINE (the bar a model must beat)
+==============================================================================
+Rule: volume_ratio_30d >= 5 AND price_change_5d >= 20%
+split target  rule_fires_rows  precision_%  recall_%  base_rate_%  lift
+train     5d              698         9.98      2.70        0.872  11.4
+train    10d              698        11.42      1.38        1.952   5.8
+  val     5d               94         8.22      3.06        0.519  15.8
+  val    10d               94         6.16      1.05        1.133   5.4
+ test     5d             1177         9.14      2.30        0.970   9.4
+ test    10d             1177         9.98      1.21        2.010   5.0
+
+==============================================================================
+10. READINESS & WARNINGS
+==============================================================================
+  ! 10 curated events excluded: BBBY_2022, EXPR_2021, SPRT_2021, MULN_2022, BGFV_2021, AMC_2023, PROG_2021, FCEL_2021, HKD_2022, WKHS_2021
+  ! Survivorship bias: universe = current listings.
+  ! Mined labels are price-defined; they measure momentum continuation, not proof of a short squeeze (no short-interest data here).
+  ! volume_ratio_30d uses the PRIOR 30 days; the live pipeline must match.
+  ! Embargo: during CV also drop training rows within ~21 days of a validation block edge (adjacent quarters sit in different folds).
+  ! The test period (2022+) should be scored ONCE, after model choices are frozen.
+
+Panel accounting: 1,729,384 rows in panel period, 348,152 dropped as ineligible, 1,381,232 eligible, 90,171 inside event windows, 348,557 kept after negative subsampling.
