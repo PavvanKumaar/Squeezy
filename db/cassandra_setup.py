@@ -1,6 +1,13 @@
 # db/cassandra_setup.py
 # Run once after Cassandra starts
 
+import sys, io
+# Force UTF-8 output so checkmarks print on Windows terminals
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+else:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
 from cassandra.cluster import Cluster
 import os
 

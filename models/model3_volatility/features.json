@@ -1,0 +1,24 @@
+{
+  "model_type": "lgbm_quantile",
+  "features": [
+    "volume_ratio_30d_norm",
+    "price_change_1d_norm",
+    "price_change_5d_norm",
+    "rsi_14_norm",
+    "volatility_10d_norm",
+    "atr_norm",
+    "abs_price_change_1d_norm",
+    "abs_price_change_5d_norm"
+  ],
+  "target": "y3 = log(max(fwd_vol_10d, 0.003))",
+  "output_schema": {
+    "daily_vol_p10": "float (exp of p10 prediction)",
+    "daily_vol_p50": "float (exp of p50 prediction)",
+    "daily_vol_p90": "float (exp of p90 prediction)",
+    "expected_10d_move_1sigma": "float (daily_vol_p50 * sqrt(10))"
+  },
+  "embargo_days": 21,
+  "min_price": 0.1,
+  "min_dollar_vol": 50000,
+  "n_train": 157001
+}

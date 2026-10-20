@@ -1,0 +1,32 @@
+{
+  "model_type": "lgbm",
+  "features": [
+    "volume_ratio_30d_norm",
+    "price_change_1d_norm",
+    "price_change_5d_norm",
+    "rsi_14_norm"
+  ],
+  "target": "y2",
+  "embargo_days": 21,
+  "min_price": 0.1,
+  "min_dollar_vol": 50000,
+  "base_rate": 0.1183813672922252,
+  "n_train": 11936,
+  "best_params": {
+    "num_leaves": 5,
+    "min_child_samples": 50
+  },
+  "trigger_col": "exh_trigger",
+  "output_schema": {
+    "applicable": "bool",
+    "p_drop": "float",
+    "base_rate": "float",
+    "lift": "float",
+    "n_train": "int"
+  },
+  "eligibility": {
+    "min_price": 0.1,
+    "min_dollar_vol": 50000,
+    "trigger_col": "exh_trigger"
+  }
+}

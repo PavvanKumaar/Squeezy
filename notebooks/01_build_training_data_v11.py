@@ -68,8 +68,9 @@ USE_CACHE = True               # cache/<SYMBOL>.parquet ; delete folder to refre
 MIN_ROWS_PER_SYMBOL = 120
 
 # scanner eligibility (causal, per row). Mirror this in the live scanner.
-MIN_PRICE = 0.50
-MIN_DOLLAR_VOL = 250_000       # trailing 20d average dollar volume (prior days)
+# v1.2 — lowered eligibility thresholds
+MIN_PRICE = 0.10
+MIN_DOLLAR_VOL = 50_000        # trailing 20d average dollar volume (prior days)
 MIN_HISTORY_ROWS = 60
 
 # forward target
@@ -106,6 +107,11 @@ NORM_FEATURES = [
     'volatility_10d_norm',
 ]
 RAW_TO_NORM = dict(zip(RAW_FEATURES, NORM_FEATURES))
+# v1.2 — additional derived features for Model 3
+V12_EXTRA_FEATURES = [
+    'abs_price_change_1d_norm',
+    'abs_price_change_5d_norm',
+]
 BOUNDS = {
     'volume_ratio_30d':       (0.0, 20.0),
     'price_change_1d':        (-1.0, 1.0),
@@ -116,6 +122,11 @@ BOUNDS = {
     'volatility_10d':         (0.0, 0.5),
 }
 PHASE_STATUSES = ('confirmed', 'relabeled_squeeze', 'mined_squeeze')
+
+# v1.2 — split-artifact guard
+SPLIT_RATIOS = [0.5, 1/3, 0.25, 0.2, 0.1, 2.0, 3.0, 4.0, 5.0, 10.0]
+SPLIT_TOL = 0.02
+SPLIT_VOLRATIO_MAX = 1.5
 
 # Alternate symbols (UNVERIFIED - report shows which was used)
 TICKER_ALIASES = {'PROG': ['PROG', 'BRTX']}
@@ -351,7 +362,87 @@ def compute_features(ohlcv):
 
     f['eligible'] = ((close >= MIN_PRICE) & (f['dollar_vol_20d'] >= MIN_DOLLAR_VOL)
                      & (f['history_days'] >= MIN_HISTORY_ROWS))
+
+    # ── v1.2: forward volatility and min-return labels ───────
+    ret = close.pct_change()
+    # fwd_vol_10d: std of 10 daily returns starting at t+1
+    # built as rolling(10) shifted back so index t has the fwd window
+    fwd_ret_shifted = ret.shift(-1)
+    raw_fwd_vol = fwd_ret_shifted.rolling(10, min_periods=10).std().shift(9)
+    dates_s = pd.Series(ohlcv.index, index=ohlcv.index)
+    ok_10 = (dates_s.shift(-10) - dates_s).dt.days <= 18
+    f['fwd_vol_10d'] = raw_fwd_vol.where(ok_10)
+
+    # min_return_5d: min(close[t+1..t+5])/close[t] - 1
+    arr = close.values
+    n_rows = len(arr)
+    min5 = np.full(n_rows, np.nan)
+    if n_rows > 5:
+        w5 = np.lib.stride_tricks.sliding_window_view(arr[1:], 5)
+        min5[:n_rows - 5] = w5.min(axis=1)
+    f['min_return_5d'] = pd.Series(min5, index=close.index) / close - 1
+    ok_5 = (dates_s.shift(-5) - dates_s).dt.days <= 10
+    f['min_return_5d'] = f['min_return_5d'].where(ok_5)
+
+    # min_return_10d: min(close[t+1..t+10])/close[t] - 1
+    min10 = np.full(n_rows, np.nan)
+    if n_rows > 10:
+        w10 = np.lib.stride_tricks.sliding_window_view(arr[1:], 10)
+        min10[:n_rows - 10] = w10.min(axis=1)
+    f['min_return_10d'] = pd.Series(min10, index=close.index) / close - 1
+    f['min_return_10d'] = f['min_return_10d'].where(ok_10)
+
+    # optional: baseline_vol_60d_lag10 (60d std using t-69..t-10)
+    f['baseline_vol_60d_lag10'] = ret.shift(10).rolling(60, min_periods=30).std()
+
+    # v1.2 derived norm columns
+    f['abs_price_change_1d_norm'] = f['price_change_1d_norm'].abs()
+    f['abs_price_change_5d_norm'] = f['price_change_5d_norm'].abs()
+
+    # v1.2 trigger flags (from _norm columns for runtime parity)
+    f['ign_trigger'] = (
+        (f['volume_ratio_30d_norm'] >= 0.15) &
+        ((f['price_change_1d_norm'] >= 0.10) | (f['price_change_5d_norm'] >= 0.25))
+    )
+    f['exh_trigger'] = (
+        (f['price_change_5d_norm'] >= 0.25) | (f['rsi_14_norm'] >= 0.80)
+    )
+
     return f
+
+
+def apply_split_guard(f):
+    """Flag rows whose forward windows contain a suspicious split-ratio price jump.
+    Sets fwd_vol_10d, min_return_5d, min_return_10d, max_return_5d, max_return_10d,
+    return_5d, return_10d, squeezed_5d, squeezed_10d to NaN for those rows.
+    Returns count of rows invalidated."""
+    close_vals = f['close'].values
+    vol_ratio = f['volume_ratio_30d'].values
+    n = len(close_vals)
+    suspect = np.zeros(n, dtype=bool)
+    for i in range(1, n):
+        if close_vals[i - 1] <= 0:
+            continue
+        ratio = close_vals[i] / close_vals[i - 1]
+        for sr in SPLIT_RATIOS:
+            if abs(ratio - sr) / sr <= SPLIT_TOL:
+                # suspicious price jump — check volume
+                if vol_ratio[i] < SPLIT_VOLRATIO_MAX:
+                    suspect[i] = True
+                break
+    # invalidate any row whose forward window contains a suspect day
+    fwd_targets = ['fwd_vol_10d', 'min_return_5d', 'min_return_10d',
+                   'max_return_5d', 'max_return_10d', 'return_5d', 'return_10d',
+                   'squeezed_5d', 'squeezed_10d']
+    invalidated = np.zeros(n, dtype=bool)
+    for j in np.where(suspect)[0]:
+        start = max(0, j - 10)
+        invalidated[start:j] = True
+    count = int(invalidated.sum())
+    for col in fwd_targets:
+        if col in f.columns:
+            f.loc[f.index[invalidated], col] = np.nan
+    return f, count
 
 
 # ─────────────────────────────────────────────────────────────
@@ -513,6 +604,10 @@ def process_symbol(sym, ohlcv, curated_evs, rng):
         mark(ep['setup'], ep['end'], k, ign, peak, True, 'mined_squeeze')
         next_ok = ep['end'] + 1
 
+    # ── v1.2: apply split-artifact guard ─────────────────────
+    f, n_split_guard = apply_split_guard(f)
+    stats_extra = {'split_guard_invalidated': n_split_guard}
+
     # ── emit rows ─────────────────────────────────────────────
     start = int(np.searchsorted(dates, pd.to_datetime(PANEL_START), 'left'))
     out = f.iloc[start:].copy()
@@ -523,9 +618,15 @@ def process_symbol(sym, ohlcv, curated_evs, rng):
     in_win = k_arr >= 0
     stats['eligible_rows'] = len(out)
     stats['event_rows'] = int(in_win.sum())
-    keep = in_win | (rng.random(len(out)) < NEG_KEEP_FRAC)
+    # v1.2 sampling: keep event-window rows (100%), trigger rows (100%), rest 20%
+    is_trigger = (out['ign_trigger'].fillna(False) | out['exh_trigger'].fillna(False)).values
+    keep = in_win | is_trigger | (rng.random(len(out)) < NEG_KEEP_FRAC)
+    # weight: event-window and trigger rows = 1.0; background rows = 1/NEG_KEEP_FRAC
+    weight_override = np.where(in_win | is_trigger, 1.0, 1.0 / NEG_KEEP_FRAC)
     out, k_arr, in_win = out[keep], k_arr[keep], in_win[keep]
+    weight_override = weight_override[keep]
     sel = np.where(keep_elig)[0][keep] + start   # absolute positions
+    stats.update(stats_extra)
 
     def col(key, default=None):
         arr = np.array([e.get(key, default) for e in events] + [default], dtype=object)
@@ -539,7 +640,7 @@ def process_symbol(sym, ohlcv, curated_evs, rng):
     out['event_ignition'] = pd.to_datetime(col('_ign', pd.NaT))
     out['lifecycle_phase'] = phase[sel]
     out['days_from_ignition'] = dfi[sel]
-    out['sample_weight'] = np.where(in_win, 1.0, 1.0 / NEG_KEEP_FRAC)
+    out['sample_weight'] = weight_override
     out['date'] = out.index
     return out.reset_index(drop=True), events, stats
 
@@ -563,6 +664,14 @@ def assign_split_groups_folds(df):
 
     df['row_ok'] = (df[RAW_FEATURES].notna().all(axis=1) & df['squeezed_10d'].notna()
                     & df['squeezed_5d'].notna())
+    # v1.2 additional row_ok flags for each model's target
+    df['row_ok_m1'] = df['row_ok'] & df['ign_trigger'].fillna(False) & df['max_return_10d'].notna()
+    df['row_ok_m2'] = (df['squeezed_10d'].notna() & df['exh_trigger'].fillna(False)
+                       & df['min_return_5d'].notna() & df[RAW_FEATURES].notna().all(axis=1))
+    df['row_ok_m3'] = (df[RAW_FEATURES].notna().all(axis=1)
+                       & df[['abs_price_change_1d_norm', 'abs_price_change_5d_norm',
+                              'volatility_10d_norm', 'atr_norm']].notna().all(axis=1)
+                       & df['fwd_vol_10d'].notna())
 
     # greedy fold balancing by positive count (train+val, non-purged)
     df['cv_fold'] = -1
@@ -631,7 +740,7 @@ def build_report(df, ev, uni):
     rep = Report()
     pd.set_option('display.width', 250)
     pd.set_option('display.max_columns', 60)
-    rep.h('SQUEEZERADAR v1.1 - DATASET METRICS')
+    rep.h('SQUEEZERADAR v1.2 - DATASET METRICS')
     rep.add(f'Generated        : {datetime.now().isoformat(timespec="seconds")}')
     rep.add(f'yfinance / pandas: {getattr(yf, "__version__", "?")} / {pd.__version__}')
     rep.add(f'Target           : squeezed_Nd = forward N-day return >= {SQUEEZE_RETURN_THRESHOLD:.0%} '
@@ -812,6 +921,76 @@ def build_report(df, ev, uni):
                        'lift': round(prec / base, 1) if pd.notna(prec) and base else np.nan})
     rep.table(pd.DataFrame(br), index=False)
 
+    # ── v1.2 additions ───────────────────────────────────────
+    rep.h('10. v1.2 TRIGGER ROWS')
+    tr = []
+    for s in ('train', 'val', 'test'):
+        g = df[df['split'] == s]
+        tr.append({'split': s,
+                   'ign_trigger_rows': int(g['ign_trigger'].sum()),
+                   'exh_trigger_rows': int(g['exh_trigger'].sum()),
+                   'both_triggers': int((g['ign_trigger'] & g['exh_trigger']).sum()),
+                   'total_rows': len(g)})
+    rep.table(pd.DataFrame(tr), index=False)
+
+    rep.sub('Per-year trigger counts')
+    yr_trg = df.assign(year=df['date'].dt.year).groupby('year').agg(
+        ign=('ign_trigger', 'sum'), exh=('exh_trigger', 'sum'), rows=('date', 'count')).reset_index()
+    rep.table(yr_trg, index=False)
+
+    rep.h('11. v1.2 MODEL TARGET BASE RATES')
+    rep.add('y1 (Model 1: max_return_10d >= 30% | ign_trigger rows):')
+    m1_rows = []
+    for s in ('train', 'val', 'test'):
+        g = df[(df['split'] == s) & df['row_ok_m1']]
+        if len(g):
+            y1 = (g['max_return_10d'] >= 0.30).astype(float)
+            m1_rows.append({'split': s, 'rows': len(g),
+                            'positives': int(y1.sum()),
+                            'base_rate_%': round(100 * float(y1.mean()), 3)})
+    if m1_rows:
+        rep.table(pd.DataFrame(m1_rows), index=False)
+
+    rep.add('y2 (Model 2: min_return_5d <= -20% | exh_trigger rows):')
+    m2_rows = []
+    for s in ('train', 'val', 'test'):
+        g = df[(df['split'] == s) & df['row_ok_m2']]
+        if len(g):
+            y2 = (g['min_return_5d'] <= -0.20).astype(float)
+            m2_rows.append({'split': s, 'rows': len(g),
+                            'positives': int(y2.sum()),
+                            'base_rate_%': round(100 * float(y2.mean()), 3)})
+    if m2_rows:
+        rep.table(pd.DataFrame(m2_rows), index=False)
+
+    rep.add('y3 (Model 3: log(fwd_vol_10d) | all eligible rows):')
+    m3_rows = []
+    for s in ('train', 'val', 'test'):
+        g = df[(df['split'] == s) & df['row_ok_m3']]
+        if len(g):
+            y3 = np.log(np.maximum(g['fwd_vol_10d'], 0.003))
+            m3_rows.append({'split': s, 'rows': len(g),
+                            'median_fwd_vol': round(float(g['fwd_vol_10d'].median()), 5),
+                            'p10_fwd_vol': round(float(g['fwd_vol_10d'].quantile(0.1)), 5),
+                            'p90_fwd_vol': round(float(g['fwd_vol_10d'].quantile(0.9)), 5)})
+    if m3_rows:
+        rep.table(pd.DataFrame(m3_rows), index=False)
+
+    rep.h('12. v1.2 CLIPPING SHARE (norm columns)')
+    clip_rows = []
+    for raw, norm in RAW_TO_NORM.items():
+        lo, hi = BOUNDS[raw]
+        s = df[raw].dropna()
+        clip_rows.append({'feature': raw,
+                          'below_lo': int((s < lo).sum()),
+                          'above_hi': int((s > hi).sum()),
+                          'clip_%': round(100 * ((s < lo) | (s > hi)).mean(), 2)})
+    rep.table(pd.DataFrame(clip_rows), index=False)
+
+    rep.add(f'Rows between 0.10 and 0.50 in price: {int(((df["close"] >= 0.10) & (df["close"] < 0.50)).sum())}')
+    split_guard_count = df[['fwd_vol_10d', 'min_return_5d']].isna().all(axis=1).sum()
+    rep.add(f'Rows with forward targets invalidated by split guard: {split_guard_count}')
+
     # 10 warnings
     rep.h('10. READINESS & WARNINGS')
     warns = []
@@ -847,7 +1026,7 @@ def build_report(df, ev, uni):
 def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print('\n' + '=' * 60)
-    print('  SqueezeRadar - Training Data Builder v1.1')
+    print('  SqueezeRadar - Training Data Builder v1.2')
     print('=' * 60)
 
     symbols = load_universe()
@@ -897,21 +1076,29 @@ def main():
     ev = pd.DataFrame(all_events)
     df = assign_split_groups_folds(df)
 
-    id_cols = ['date', 'symbol', 'split', 'group_id', 'cv_fold', 'row_ok', 'sample_weight',
-               'event_id', 'event_source', 'event_status', 'event_use', 'event_ignition',
-               'lifecycle_phase', 'days_from_ignition', 'close', 'volume', 'history_days',
-               'dollar_vol_20d']
+    id_cols = ['date', 'symbol', 'split', 'group_id', 'cv_fold', 'row_ok',
+               'row_ok_m1', 'row_ok_m2', 'row_ok_m3',
+               'sample_weight', 'event_id', 'event_source', 'event_status', 'event_use',
+               'event_ignition', 'lifecycle_phase', 'days_from_ignition',
+               'close', 'volume', 'history_days', 'dollar_vol_20d']
     label_cols = ['return_5d', 'return_10d', 'max_return_5d', 'max_return_10d',
-                  'squeezed_5d', 'squeezed_10d']
-    df = df[id_cols + RAW_FEATURES + NORM_FEATURES + label_cols]
+                  'squeezed_5d', 'squeezed_10d',
+                  'min_return_5d', 'min_return_10d', 'fwd_vol_10d', 'baseline_vol_60d_lag10']
+    trigger_cols = ['ign_trigger', 'exh_trigger']
+    extra_norm_cols = V12_EXTRA_FEATURES
+    all_cols = id_cols + RAW_FEATURES + NORM_FEATURES + extra_norm_cols + trigger_cols + label_cols
+    # only keep columns that actually exist
+    all_cols = [c for c in all_cols if c in df.columns]
+    df = df[all_cols]
+    # v1.2: save as v1_2_raw (do NOT overwrite v1_1)
     try:
-        df.to_parquet(OUTPUT_DIR / 'v1_1_raw.parquet', index=False)
-    except Exception as e:  # noqa  (e.g. broken pyarrow install)
-        df.to_pickle(OUTPUT_DIR / 'v1_1_raw.pkl')
-        print(f'  ! parquet write failed ({e!r}); saved v1_1_raw.pkl instead. '
-              f'Fix pyarrow, then run: pd.read_pickle(...).to_parquet(...)')
+        df.to_parquet(OUTPUT_DIR / 'v1_2_raw.parquet', index=False)
+        print(f'  saved v1_2_raw.parquet')
+    except Exception as e:  # noqa
+        df.to_pickle(OUTPUT_DIR / 'v1_2_raw.pkl')
+        print(f'  ! parquet write failed ({e!r}); saved v1_2_raw.pkl instead.')
     ev.drop(columns=[c for c in ev.columns if c.startswith('_')]).to_csv(
-        OUTPUT_DIR / 'v1_1_events.csv', index=False)
+        OUTPUT_DIR / 'v1_2_events.csv', index=False)
 
     uni = {'requested': len(symbols), 'ok': len(ohlcv_map), 'errors': errors,
            'symbols_ok': set(ohlcv_map)}
@@ -920,11 +1107,11 @@ def main():
     rep.add(f'Panel accounting: {tot["panel"]:,} rows in panel period, {tot["inelig"]:,} dropped as '
             f'ineligible, {tot["elig"]:,} eligible, {tot["event"]:,} inside event windows, '
             f'{len(df):,} kept after negative subsampling.')
-    rep.save(OUTPUT_DIR / 'dataset_metrics_v1_1.txt')
+    rep.save(OUTPUT_DIR / 'dataset_metrics_v1_2.txt')
 
     print(f'\n  dataset saved to {OUTPUT_DIR}  ({len(df):,} rows)')
-    print(f'  saved {OUTPUT_DIR / "v1_1_events.csv"}  ({len(ev)} events)')
-    print(f'  saved {OUTPUT_DIR / "dataset_metrics_v1_1.txt"}')
+    print(f'  saved {OUTPUT_DIR / "v1_2_events.csv"}  ({len(ev)} events)')
+    print(f'  saved {OUTPUT_DIR / "dataset_metrics_v1_2.txt"}')
     return df
 
 

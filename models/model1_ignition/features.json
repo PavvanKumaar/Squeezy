@@ -1,0 +1,31 @@
+{
+  "model_type": "logistic",
+  "features": [
+    "volume_ratio_30d_norm",
+    "price_change_1d_norm",
+    "price_change_5d_norm",
+    "rsi_14_norm"
+  ],
+  "target": "y1",
+  "embargo_days": 21,
+  "min_price": 0.1,
+  "min_dollar_vol": 50000,
+  "base_rate": 0.17945945945945946,
+  "n_train": 3700,
+  "best_params": {
+    "C": 0.3
+  },
+  "trigger_col": "ign_trigger",
+  "output_schema": {
+    "applicable": "bool",
+    "p_continue": "float",
+    "base_rate": "float",
+    "lift": "float",
+    "n_train": "int"
+  },
+  "eligibility": {
+    "min_price": 0.1,
+    "min_dollar_vol": 50000,
+    "trigger_col": "ign_trigger"
+  }
+}
