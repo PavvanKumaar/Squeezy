@@ -34,6 +34,12 @@ import requests
 from datetime import datetime
 from typing import Optional
 from dotenv import load_dotenv
+import cloudscraper
+import  pandas as pd
+import re
+from io import StringIO
+
+from curl_cffi import requests as cffi_requests
 
 load_dotenv()
 
@@ -145,60 +151,103 @@ class UniverseScreener:
     # ═════════════════════════════════════════════════════════
 
     def _get_candidates(self) -> list:
-        """
-        Pulls candidate tickers from Finviz screener.
-        Falls back to a curated high-SI list if Finviz unavailable.
-        Returns list of ticker strings.
-        """
-        if FINVIZ_AVAILABLE:
-            tickers = self._screen_finviz()
-        else:
+        tickers = []
+
+        # 1. Primary: Finviz Screener
+        finviz_tickers = self._screen_finviz()
+        if finviz_tickers:
+            tickers.extend(finviz_tickers)
+
+        # 2. Secondary: HighShortInterest (catches GRPN, LCID, etc.)
+        hsi_tickers = self._screen_highshortinterest()
+        if hsi_tickers:
+            tickers.extend(hsi_tickers)
+
+        # 3. Fallback if both fail
+        if not tickers:
             tickers = self._screen_fallback()
 
-        # Cross-check float with yfinance
-        # Finviz float data can be stale or wrong
-        # Only check if we have a manageable number
-        if len(tickers) <= 500:
-            tickers = self._validate_floats(tickers)
+        unique_tickers = list(dict.fromkeys(tickers))
+        print(f'\n  Combined screen output: {len(unique_tickers)} unique tickers found')
 
-        return tickers
+        # Validate floats via yfinance
+        if len(unique_tickers) <= 500:
+            unique_tickers = self._validate_floats(unique_tickers)
+
+        return unique_tickers
 
     def _screen_finviz(self) -> list:
         """
-        Uses Finviz screener to get stocks matching our criteria.
-
-        Finviz filters applied:
-          Short Float: Over 15%  → short interest > 15%
-          Average Volume:        → > 200K shares/day
-          Country: USA           → US equities only
-          Market Cap: Small      → proxy for small float
-
-        Float filter applied manually after (Finviz has no direct filter).
+        Scrapes Finviz using updated quote link pattern (/quote?t=TICKER).
         """
         try:
-            overview = Overview()
-            filters  = {
-                'Float Short':     'Over 15%',
-                'Average Volume':  'Over 200K',
-                'Country':         'USA',
-            }
-            overview.set_filter(filters_dict=filters)
+            tickers = []
+            for page_start in range(1, 101, 20):
+                url = f"https://finviz.com/screener.ashx?v=111&f=sh_short_o15,sh_avgvol_o200,geo_usa&ft=4&r={page_start}"
+                print(f'  Pulling Finviz screener (page starting at {page_start})...')
+                
+                resp = cffi_requests.get(url, impersonate="chrome120", timeout=15)
 
-            print('  Pulling Finviz screener...')
-            df = overview.screener_view()
+                if resp.status_code != 200:
+                    print(f'  Finviz page {page_start} HTTP {resp.status_code}')
+                    break
 
-            if df is None or df.empty:
-                print('  Finviz returned empty result')
-                return self._screen_fallback()
+                # Match quote links like /quote?t=AAOI&...
+                raw_matches = re.findall(r'quote\?t=([A-Za-z0-9.-]+)', resp.text, re.IGNORECASE)
 
-            tickers = df['Ticker'].dropna().tolist()
-            print(f'  Finviz returned {len(tickers)} tickers '
-                  f'before float filter')
-            return tickers
+                page_tickers = []
+                for raw in raw_matches:
+                    ticker = raw.split('&')[0].strip().upper()
+                    if ticker and len(ticker) <= 5 and ticker not in page_tickers:
+                        page_tickers.append(ticker)
+
+                if not page_tickers:
+                    print(f'  No tickers parsed on page starting at {page_start}')
+                    break
+
+                tickers.extend(page_tickers)
+
+            unique = list(dict.fromkeys(tickers))
+            print(f'  Finviz returned {len(unique)} tickers')
+            return unique
 
         except Exception as e:
             print(f'  Finviz error: {e}')
-            return self._screen_fallback()
+            return []
+
+    def _screen_highshortinterest(self) -> list:
+        """
+        Scrapes HighShortInterest list, filtering out navigation headers.
+        """
+        try:
+            url = "https://highshortinterest.com/all/"
+            print('  Pulling HighShortInterest list...')
+            
+            resp = cffi_requests.get(url, impersonate="chrome120", timeout=15)
+            
+            if resp.status_code != 200:
+                print(f'  HighShortInterest failed with status {resp.status_code}')
+                return []
+
+            # Match ticker cells in the table
+            raw_tickers = re.findall(r'<td[^>]*>\s*<a[^>]*>([A-Z0-9.-]+)</a>\s*</td>', resp.text, re.IGNORECASE)
+            if not raw_tickers:
+                raw_tickers = re.findall(r'>([A-Z]{1,5})</a>', resp.text)
+
+            # Filter out non-ticker menu headers
+            exclude_headers = {'ALL', 'NASDAQ', 'NYSE', 'AMEX', 'HOME', 'CONTACT', 'PRIVACY', 'FAQ', 'STOCKS'}
+            clean_tickers = [
+                t.strip().upper() for t in raw_tickers 
+                if t.strip().upper() not in exclude_headers and 1 <= len(t.strip()) <= 5
+            ]
+
+            unique = list(dict.fromkeys(clean_tickers))
+            print(f'  HighShortInterest returned {len(unique)} tickers')
+            return unique
+
+        except Exception as e:
+            print(f'  HighShortInterest error: {e}')
+            return []
 
     def _screen_fallback(self) -> list:
         """

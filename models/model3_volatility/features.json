@@ -20,5 +20,5 @@
   "embargo_days": 21,
   "min_price": 0.1,
   "min_dollar_vol": 50000,
-  "n_train": 157001
+  "n_train": 157093
 }

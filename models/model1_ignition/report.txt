@@ -2,77 +2,74 @@
 ==============================================================================
 SQUEEZERADAR v1.2 — Model 1: Ignition Continuation
 ==============================================================================
-Generated: 2026-10-20T19:27:33
+Generated: 2026-10-22T15:01:05
 Features: ['volume_ratio_30d_norm', 'price_change_1d_norm', 'price_change_5d_norm', 'rsi_14_norm']
 Target y1: 1 if max_return_10d >= 30% | ign_trigger rows
 Eligibility: MIN_PRICE=0.1, MIN_DOLLAR_VOL=50000
 
 Model 1 — Ignition Continuation:
-  Train+val rows: 3,700  positives: 664  weighted base rate: 17.946%
-  Test rows: 7,372
-  Model 1 — Ignition Continuation: 3700 trigger rows in train+val.
+  Train+val rows: 3,698  positives: 664  weighted base rate: 17.956%
+  Test rows: 7,359
+  Model 1 — Ignition Continuation: 3698 trigger rows in train+val.
 
 --- Model 1 — Ignition Continuation: grouped CV model selection ---
-  Logistic C=0.01: mean CV PR-AUC=0.2609 (folds: 0.248, 0.232, 0.284, 0.279, 0.263)
-  Logistic C=0.03: mean CV PR-AUC=0.2618 (folds: 0.248, 0.230, 0.283, 0.285, 0.263)
-  Logistic C=0.1: mean CV PR-AUC=0.2626 (folds: 0.248, 0.232, 0.284, 0.288, 0.261)
-  Logistic C=0.3: mean CV PR-AUC=0.2627 (folds: 0.248, 0.231, 0.284, 0.288, 0.261)
-  Logistic C=1.0: mean CV PR-AUC=0.2626 (folds: 0.248, 0.231, 0.285, 0.288, 0.261)
-  LightGBM leaves=4 min_cs=50: mean CV PR-AUC=0.2612
-  LightGBM leaves=4 min_cs=75: mean CV PR-AUC=0.2599
-  LightGBM leaves=4 min_cs=100: mean CV PR-AUC=0.2603
-  LightGBM leaves=5 min_cs=50: mean CV PR-AUC=0.2630
-  LightGBM leaves=5 min_cs=75: mean CV PR-AUC=0.2628
-  LightGBM leaves=5 min_cs=100: mean CV PR-AUC=0.2633
-  LightGBM leaves=6 min_cs=50: mean CV PR-AUC=0.2633
-  LightGBM leaves=6 min_cs=75: mean CV PR-AUC=0.2603
-  LightGBM leaves=6 min_cs=100: mean CV PR-AUC=0.2635
-  LightGBM leaves=7 min_cs=50: mean CV PR-AUC=0.2593
-  LightGBM leaves=7 min_cs=75: mean CV PR-AUC=0.2606
-  LightGBM leaves=7 min_cs=100: mean CV PR-AUC=0.2601
-  >> Selected: logistic params={'C': 0.3} PR-AUC=0.2627
+  Logistic C=0.01: mean CV PR-AUC=0.2610 (folds: 0.248, 0.232, 0.284, 0.279, 0.263)
+  Logistic C=0.03: mean CV PR-AUC=0.2619 (folds: 0.248, 0.230, 0.283, 0.285, 0.263)
+  Logistic C=0.1: mean CV PR-AUC=0.2629 (folds: 0.248, 0.232, 0.284, 0.288, 0.262)
+  Logistic C=0.3: mean CV PR-AUC=0.2628 (folds: 0.248, 0.231, 0.284, 0.288, 0.262)
+  Logistic C=1.0: mean CV PR-AUC=0.2626 (folds: 0.248, 0.231, 0.284, 0.288, 0.261)
+  LightGBM leaves=4 min_cs=50: mean CV PR-AUC=0.2618
+  LightGBM leaves=4 min_cs=75: mean CV PR-AUC=0.2639
+  LightGBM leaves=4 min_cs=100: mean CV PR-AUC=0.2645
+  LightGBM leaves=5 min_cs=50: mean CV PR-AUC=0.2635
+  LightGBM leaves=5 min_cs=75: mean CV PR-AUC=0.2624
+  LightGBM leaves=5 min_cs=100: mean CV PR-AUC=0.2639
+  LightGBM leaves=6 min_cs=50: mean CV PR-AUC=0.2619
+  LightGBM leaves=6 min_cs=75: mean CV PR-AUC=0.2612
+  LightGBM leaves=6 min_cs=100: mean CV PR-AUC=0.2622
+  LightGBM leaves=7 min_cs=50: mean CV PR-AUC=0.2588
+  LightGBM leaves=7 min_cs=75: mean CV PR-AUC=0.2603
+  LightGBM leaves=7 min_cs=100: mean CV PR-AUC=0.2594
+  >> Selected: lgbm params={'num_leaves': 4, 'min_child_samples': 75, 'best_iters': [42, 113, 168, 115, 54]} PR-AUC=0.2639
 
 ==============================================================================
 Model 1 — Ignition Continuation: OOF Metrics
 ==============================================================================
-  raw: {'n': 3700, 'pos': 664, 'base_%': 17.946, 'PR_AUC': 0.2461, 'ROC_AUC': 0.5992, 'brier': 0.14474, 'logloss': 0.46242, 'mean_pred_%': 17.435, 'lift@top20': 1.49}
-  platt: {'n': 3700, 'pos': 664, 'base_%': 17.946, 'PR_AUC': 0.2388, 'ROC_AUC': 0.5872, 'brier': 0.1453, 'logloss': 0.46475, 'mean_pred_%': 18.016, 'lift@top20': 1.51}
+  raw: {'n': 3698, 'pos': 664, 'base_%': 17.956, 'PR_AUC': 0.2529, 'ROC_AUC': 0.6163, 'brier': 0.14369, 'logloss': 0.45865, 'mean_pred_%': 17.241, 'lift@top20': 1.57}
+  platt: {'n': 3698, 'pos': 664, 'base_%': 17.956, 'PR_AUC': 0.248, 'ROC_AUC': 0.6076, 'brier': 0.14408, 'logloss': 0.46015, 'mean_pred_%': 18.026, 'lift@top20': 1.56}
 
 --- Calibration table (platt) ---
    pred_bin  weighted_share_%  mean_pred_%  actual_%  rows
-0.020-0.040              0.05         2.76      0.00     2
-0.040-0.080              1.32         7.23     12.24    49
-0.080-0.150             27.92        12.70     14.23  1033
-0.150-0.300             65.68        19.25     18.81  2430
-0.300-1.000              5.03        34.37     29.03   186
+0.040-0.080              0.81         7.73     10.00    30
+0.080-0.150             39.16        12.21     13.26  1448
+0.150-0.300             55.76        21.16     20.42  2062
+0.300-1.000              4.27        32.45     30.38   158
 
 --- Per-fold stability (platt) ---
   n  pos  base_%  PR_AUC  ROC_AUC   brier  logloss  mean_pred_%  fold
-621  137  22.061  0.2484   0.5558 0.17948  0.55557       16.356     0
-741  128  17.274  0.2313   0.6034 0.14153  0.45443       17.342     1
-734  136  18.529  0.2842   0.6298 0.14652  0.46561       18.087     2
-723  128  17.704  0.2882   0.6616 0.14171  0.45474       20.266     3
-881  135  15.323  0.2614   0.6362 0.12629  0.41689       17.845     4
+621  137  22.061  0.2576   0.5752 0.17399  0.53671       16.249     0
+741  128  17.274  0.2346   0.6146 0.14087  0.45174       17.497     1
+733  136  18.554  0.3197   0.6274 0.14550  0.46321       17.975     2
+723  128  17.704  0.2576   0.6455 0.14147  0.45194       20.025     3
+880  135  15.341  0.2499   0.6506 0.12666  0.41739       18.126     4
 
 --- Per-year stability (platt) ---
    n  pos  base_%  PR_AUC  ROC_AUC   brier  logloss  mean_pred_%  year
- 570   70  12.281  0.1873   0.6287 0.10939  0.37606       17.616  2018
- 642   87  13.551  0.2208   0.6453 0.11494  0.38832       17.045  2019
-1376  279  20.276  0.2613   0.5824 0.15974  0.49871       18.704  2020
-1112  228  20.504  0.2580   0.5528 0.16336  0.51230       17.928  2021
+ 570   70  12.281  0.1833   0.6412 0.10754  0.37006       17.253  2018
+ 641   87  13.573  0.2369   0.6324 0.11482  0.38696       16.609  2019
+1376  279  20.276  0.2573   0.5922 0.15937  0.49754       19.032  2020
+1111  228  20.522  0.2895   0.5849 0.16078  0.50228       17.995  2021
 
 --- Sanity: label-shuffle ROC (should be ~0.5) ---
-  Shuffled ROC: mean=0.509 range=0.469-0.559
+  Shuffled ROC: mean=0.491 range=0.485-0.497
 
 --- Model 1 — Ignition Continuation: Baseline comparison (OOF, weighted) ---
-  Rule baseline: 22.18% precision (base rate: 17.95%, lift: 1.24x)
+  Rule baseline: 22.18% precision (base rate: 17.96%, lift: 1.24x)
 
 --- Model 1 — Ignition Continuation: Final model fit (all train+val) ---
-  Final model type: logistic
+  Final model type: lgbm
 
 ==============================================================================
 Model 1 — Ignition Continuation: Test Split
 ==============================================================================
-   n  pos  base_%  PR_AUC  ROC_AUC   brier  logloss  mean_pred_% model
-7372 1207  16.373  0.2247   0.6122 0.13543  0.43938       18.458   raw
-7372 1207  16.373  0.2247   0.6122 0.13547  0.43944       18.463 platt
+  Not scored. Pass --score-test to evaluate once.

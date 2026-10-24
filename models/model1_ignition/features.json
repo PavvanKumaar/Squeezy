@@ -1,5 +1,5 @@
 {
-  "model_type": "logistic",
+  "model_type": "lgbm",
   "features": [
     "volume_ratio_30d_norm",
     "price_change_1d_norm",
@@ -10,10 +10,11 @@
   "embargo_days": 21,
   "min_price": 0.1,
   "min_dollar_vol": 50000,
-  "base_rate": 0.17945945945945946,
-  "n_train": 3700,
+  "base_rate": 0.1795565170362358,
+  "n_train": 3698,
   "best_params": {
-    "C": 0.3
+    "num_leaves": 4,
+    "min_child_samples": 75
   },
   "trigger_col": "ign_trigger",
   "output_schema": {

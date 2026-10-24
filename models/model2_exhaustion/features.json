@@ -10,10 +10,10 @@
   "embargo_days": 21,
   "min_price": 0.1,
   "min_dollar_vol": 50000,
-  "base_rate": 0.1183813672922252,
-  "n_train": 11936,
+  "base_rate": 0.11836153459540961,
+  "n_train": 11938,
   "best_params": {
-    "num_leaves": 5,
+    "num_leaves": 6,
     "min_child_samples": 50
   },
   "trigger_col": "exh_trigger",

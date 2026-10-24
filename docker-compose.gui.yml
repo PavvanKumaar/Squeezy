@@ -1,0 +1,53 @@
+services:
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    networks:
+      - squeezy_default
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: redisinsight
+    ports:
+      - "5540:5540"
+    networks:
+      - squeezy_default
+
+  mongo-express:
+    image: mongo-express
+    container_name: mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: squeezradar_mongo
+      ME_CONFIG_MONGODB_PORT: 27017
+    networks:
+      - squeezy_default
+
+  elasticvue:
+    image: cars10/elasticvue:latest
+    container_name: elasticvue
+    ports:
+      - "8080:8080"
+    networks:
+      - squeezy_default
+
+  cassandra-web:
+    image: ipushc/cassandra-web
+    container_name: cassandra-web
+    ports:
+      - "3000:8083"
+    environment:
+      CASSANDRA_HOST: squeezradar_cassandra
+      CASSANDRA_PORT: 9042
+    networks:
+      - squeezy_default
+
+networks:
+  squeezy_default:
+    external: true

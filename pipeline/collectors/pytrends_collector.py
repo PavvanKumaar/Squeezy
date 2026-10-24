@@ -21,15 +21,14 @@ class PyTrendsCollector:
 
     def collect(self, ticker: str) -> dict:
         """
-        Gets Google search interest for a ticker
-        Returns score 0-100 where 100 = peak interest
-        Score is RELATIVE not absolute
+        Gets Google search interest for a ticker.
+        Returns score 0-100 where 100 = peak interest.
         """
         start = time.time()
 
         try:
-            # Build payload — search for "$GME" and "GME stock"
-            kw_list = [f"${ticker}", f"{ticker} stock"]
+            # Use real search terms without cashtags ($)
+            kw_list = [ticker, f"{ticker} stock"]
             self.pytrends.build_payload(
                 kw_list,
                 timeframe='now 7-d',  # last 7 days
@@ -46,14 +45,24 @@ class PyTrendsCollector:
                     'error': False
                 }
 
-            # Average the two keyword columns
-            avg_score = float(df[kw_list].mean(axis=1).mean())
-            peak_score = float(df[kw_list].max(axis=1).max())
-            recent_score = float(
-                df[kw_list].mean(axis=1).iloc[-1])
+            # Filter out incomplete partial rows (isPartial == True)
+            if 'isPartial' in df.columns:
+                valid_df = df[df['isPartial'] == False]
+                # Fallback to full df if valid_df is empty
+                if valid_df.empty:
+                    valid_df = df
+            else:
+                valid_df = df
 
-            # Spike = recent score is 3x the weekly average
-            trend_spike = recent_score > (avg_score * 3)
+            # Calculate composite interest across keywords
+            combined_series = valid_df[kw_list].mean(axis=1)
+
+            recent_score = float(combined_series.iloc[-1])
+            avg_score = float(combined_series.mean())
+            peak_score = float(combined_series.max())
+
+            # Spike = recent score is 3x the 7-day average
+            trend_spike = recent_score > (avg_score * 3) and recent_score >= 20
 
             result = {
                 'ticker': ticker,
@@ -74,21 +83,19 @@ class PyTrendsCollector:
                   f"score: {recent_score:.0f}/100 | "
                   f"spike: {trend_spike}")
 
-            # IMPORTANT: sleep to avoid rate limiting
-            # pytrends gets blocked if you call too fast
             time.sleep(2)
-
             return result
 
         except Exception as e:
             self._log(ticker, 'failed', 0, str(e), 0)
             print(f"  ✗ {ticker} Trends failed: {e}")
-            # Sleep on error too (might be rate limited)
             time.sleep(10)
-            return {'ticker': ticker,
-                    'trend_score': 0,
-                    'error': True,
-                    'error_message': str(e)}
+            return {
+                'ticker': ticker,
+                'trend_score': 0,
+                'error': True,
+                'error_message': str(e)
+            }
 
     def _save(self, ticker: str, result: dict):
         cur = self.pg.cursor()
